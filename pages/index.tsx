@@ -1,25 +1,28 @@
-import { useState, useEffect } from "react";
+
+import { useEffect, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
 
-const supabase = typeof window !== "undefined"
-  ? createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    )
-  : null;
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 
 export default function Home() {
   const [session, setSession] = useState(null);
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [trips, setTrips] = useState<any[]>([]);
+  const [newTripName, setNewTripName] = useState("");
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
       setSession(data.session);
+      if (data.session) {
+        fetchTrips();
+      }
     });
 
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
+      if (session) fetchTrips();
     });
 
     return () => {
@@ -27,44 +30,42 @@ export default function Home() {
     };
   }, []);
 
-const signIn = async () => {
-  const { error } = await supabase.auth.signInWithPassword({ email, password });
-  if (error) {
-    alert("Chyba při přihlášení: " + error.message);
-  }
-};
+  const fetchTrips = async () => {
+    const { data } = await supabase
+      .from("trips")
+      .select("*")
+      .eq("user_id", supabase.auth.getUser().then(u => u.data.user?.id));
+    setTrips(data || []);
+  };
 
-const signUp = async () => {
-  const { error } = await supabase.auth.signUp({ email, password });
-  if (error) {
-    alert("Chyba při registraci: " + error.message);
-  } else {
-    alert("Účet byl vytvořen, nyní potvrď svůj e-mail a přihlaš se.");
-  }
-};
-
+  const createTrip = async () => {
+    if (!newTripName) return;
+    const user = await supabase.auth.getUser();
+    await supabase.from("trips").insert([{ name: newTripName, user_id: user.data.user?.id }]);
+    setNewTripName("");
+    fetchTrips();
+  };
 
   const signOut = async () => {
     await supabase.auth.signOut();
+    setSession(null);
   };
 
   if (!session) {
-    return (
-      <div>
-        <h1>TripBuddy - Přihlášení</h1>
-        <input placeholder="Email" onChange={(e) => setEmail(e.target.value)} />
-        <input type="password" placeholder="Heslo" onChange={(e) => setPassword(e.target.value)} />
-        <button onClick={signIn}>Přihlásit</button>
-        <button onClick={signUp}>Registrovat</button>
-      </div>
-    );
+    return <div><h1>Přihlášení nutné</h1></div>;
   }
 
   return (
     <div>
-      <h1>Vítej v TripBuddy!</h1>
-      <p>Přihlášen jako {session.user.email}</p>
-      <button onClick={signOut}>Odhlásit se</button>
+      <h1>Moje výlety</h1>
+      <input placeholder="Název výletu" value={newTripName} onChange={(e) => setNewTripName(e.target.value)} />
+      <button onClick={createTrip}>Vytvořit výlet</button>
+      <ul>
+        {trips.map((trip) => (
+          <li key={trip.id}>{trip.name}</li>
+        ))}
+      </ul>
+      <button onClick={signOut}>Odhlásit</button>
     </div>
   );
 }
