@@ -27,13 +27,22 @@ export default function Home() {
     };
   }, []);
 
-  const signIn = async () => {
-    await supabase.auth.signInWithPassword({ email, password });
-  };
+const signIn = async () => {
+  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error) {
+    alert("Chyba při přihlášení: " + error.message);
+  }
+};
 
-  const signUp = async () => {
-    await supabase.auth.signUp({ email, password });
-  };
+const signUp = async () => {
+  const { error } = await supabase.auth.signUp({ email, password });
+  if (error) {
+    alert("Chyba při registraci: " + error.message);
+  } else {
+    alert("Účet byl vytvořen, nyní potvrď svůj e-mail a přihlaš se.");
+  }
+};
+
 
   const signOut = async () => {
     await supabase.auth.signOut();
